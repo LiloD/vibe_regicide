@@ -1,310 +1,146 @@
 -- Regicide Game Main File
--- Based on Love2D Game Engine
+-- 弑君者游戏主文件 - 基于Love2D游戏引擎
+--
+-- 游戏概述：
+-- 弑君者是一款卡牌策略游戏，玩家需要使用扑克牌击败一系列BOSS（J、Q、K）。
+-- 每种花色都有不同的特殊效果，与BOSS同花色的牌不会产生效果。
+--
+-- 模块职责：
+-- 1. Love2D引擎入口点，处理游戏生命周期
+-- 2. 游戏初始化：设置窗口、创建游戏状态、初始化牌堆
+-- 3. 用户输入处理：转发键盘事件到游戏状态模块
+-- 4. 游戏渲染：绘制游戏界面、卡牌、BOSS信息、日志等
+--
+-- Love2D核心回调函数：
+-- love.load()      - 游戏初始化，设置窗口和初始状态
+-- love.keypressed(key) - 键盘输入处理
+-- love.draw()      - 游戏画面渲染
+--
+-- 界面绘制内容：
+-- - 玩家手牌（带选择高亮）
+-- - BOSS信息（当前BOSS、血量、伤害）
+-- - 回合阶段和提示信息
+-- - 已打出的卡牌
+-- - 操作说明
+-- - 游戏日志
+--
+-- 视觉特色：
+-- - 黄色高亮：出牌选择
+-- - 橙色高亮：伤害抵挡选择
+-- - 数字快捷键：1-8选择卡牌
+-- - Enter键确认选择
+-- - R键重新开始
 
--- Card suit definitions
-local SUITS = {
-    CLUBS = "Clubs",    -- Clubs: Double attack power
-    DIAMONDS = "Diamonds", -- Diamonds: Draw one card
-    HEARTS = "Hearts",   -- Hearts: Heal 1 HP
-    SPADES = "Spades"    -- Spades: No special effect
-}
+-- Import modules
+local game_state = require("game_state")
+local deck_manager = require("deck_manager")
+local rules = require("rules")
 
--- Card type definitions
-local CARD_TYPES = {
-    NORMAL = "Normal",
-    ROYAL = "Royal"
-}
+-- Global game state
+local gameState
 
--- Suit abbreviation mapping
-local SUIT_ABBREVIATIONS = {
-    ["Clubs"] = "C",
-    ["Diamonds"] = "D", 
-    ["Hearts"] = "H",
-    ["Spades"] = "S"
-}
-
--- Function to get card abbreviation
-function getCardAbbreviation(card)
-    local suitAbbr = SUIT_ABBREVIATIONS[card.suit] or card.suit:sub(1,1)
-    return suitAbbr .. card.rank
-end
-
--- Create card data structure
-function createCard(suit, rank, cardType)
-    local card = {
-        suit = suit,
-        rank = rank,
-        type = cardType,
-        attack = 0,
-        health = 0
-    }
-    
-    -- Set properties based on card type
-    if cardType == CARD_TYPES.NORMAL then
-        -- Normal cards: A=1, 2=2, ..., 10=10
-        card.attack = rank
-        card.health = 0
-    else
-        -- Royal cards: J=10, Q=15, K=20
-        if rank == "J" then
-            card.attack = 10
-            card.health = 20
-        elseif rank == "Q" then
-            card.attack = 15
-            card.health = 30
-        elseif rank == "K" then
-            card.attack = 20
-            card.health = 40
-        end
-    end
-    
-    return card
-end
-
--- Game state management
-local gameState = {
-    -- Player state
-    player = {
-        hand = {},           -- Hand cards list
-        handLimit = 8,       -- Hand limit
-        deck = {},           -- Player deck
-        discard = {}         -- Discard pile
-    },
-    
-    -- BOSS state
-    boss = {
-        current = nil,       -- Current BOSS card
-        health = 0,          -- Remaining health
-        royalDeck = {}       -- Royal member deck
-    },
-    
-    -- Turn state
-    turn = {
-        phase = "player",    -- Current turn phase
-        message = "Game started! Press S to shuffle, D to draw"
-    },
-    
-    -- Operation log
-    log = {}
-}
-
--- Add log entry
-function addLog(message)
-    table.insert(gameState.log, 1, message)
-    if #gameState.log > 10 then
-        table.remove(gameState.log, 11)
-    end
-end
-
--- Initialize complete deck
-function initializeDeck()
-    local deck = {}
-    
-    -- Create normal cards (A-10)
-    local normalRanks = {"A", "2", "3", "4", "5", "6", "7", "8", "9", "10"}
-    for _, suit in pairs(SUITS) do
-        for _, rank in ipairs(normalRanks) do
-            local numericRank = 0
-            -- Convert A to 1, other ranks to their numeric value
-            if rank == "A" then
-                numericRank = 1
-            else
-                numericRank = tonumber(rank)
-            end
-            table.insert(deck, createCard(suit, numericRank, CARD_TYPES.NORMAL))
-        end
-    end
-    
-    -- Create royal cards (J, Q, K)
-    local royalRanks = {"J", "Q", "K"}
-    for _, suit in pairs(SUITS) do
-        for _, rank in ipairs(royalRanks) do
-            table.insert(gameState.boss.royalDeck, createCard(suit, rank, CARD_TYPES.ROYAL))
-        end
-    end
-    
-    return deck
-end
-
--- Shuffle deck using Fisher-Yates algorithm
-function shuffleDeck(deck)
-    local shuffled = {}
-    -- Copy the original deck
-    for i = 1, #deck do
-        shuffled[i] = deck[i]
-    end
-    
-    -- Fisher-Yates shuffle algorithm
-    for i = #shuffled, 2, -1 do
-        local j = math.random(i)
-        shuffled[i], shuffled[j] = shuffled[j], shuffled[i]
-    end
-    
-    return shuffled
-end
-
--- Draw card logic
-function drawCard()
-    if #gameState.player.deck == 0 then
-        -- Deck is empty, reshuffle discard pile
-        if #gameState.player.discard > 0 then
-            gameState.player.deck = shuffleDeck(gameState.player.discard)
-            gameState.player.discard = {}
-            addLog("Deck empty, reshuffling discard pile")
-        else
-            addLog("Both deck and discard pile are empty, cannot draw")
-            return nil
-        end
-    end
-    
-    if #gameState.player.hand < gameState.player.handLimit then
-        local card = table.remove(gameState.player.deck, 1)
-        table.insert(gameState.player.hand, card)
-        addLog("Drew a card: " .. card.suit .. card.rank)
-        return card
-    else
-        addLog("Hand full, cannot draw")
-        return nil
-    end
-end
-
--- Discard card logic
-function discardCard(cardIndex)
-    if cardIndex and cardIndex >= 1 and cardIndex <= #gameState.player.hand then
-        local card = table.remove(gameState.player.hand, cardIndex)
-        table.insert(gameState.player.discard, card)
-        addLog("Discarded a card: " .. card.suit .. card.rank)
-        return card
-    end
-    return nil
-end
-
--- Initialize BOSS
-function initializeBoss()
-    if #gameState.boss.royalDeck > 0 then
-        gameState.boss.current = table.remove(gameState.boss.royalDeck, 1)
-        gameState.boss.health = gameState.boss.current.health
-        addLog("BOSS appears: " .. gameState.boss.current.suit .. gameState.boss.current.rank)
-    else
-        addLog("All BOSS defeated! Game victory!")
-    end
-end
-
--- Game initialization
+-- Initialize game
 function love.load()
-    -- Set random seed for proper shuffling
-    math.randomseed(os.time())
+    -- Set window size
+    love.window.setMode(800, 600)
     
-    -- Set background color to dark blue
-    love.graphics.setBackgroundColor(0.1, 0.1, 0.3)
+    -- Initialize game state
+    gameState = game_state.initializeGameState()
     
-    -- Initialize and shuffle player deck
-    gameState.player.deck = initializeDeck()
-    gameState.player.deck = shuffleDeck(gameState.player.deck)
+    -- Initialize decks
+    deck_manager.initializePlayerDeck(gameState)
+    deck_manager.initializeBossDeck(gameState)
+
+    -- Set initial phase
+    game_state.change_phase(gameState, rules.TURN_PHASE.PLAYER)
     
-    -- Initialize first BOSS
-    initializeBoss()
-    
-    -- Draw initial 5 cards for player
-    for i = 1, 5 do
-        drawCard()
-    end
-    
-    addLog("Game initialization complete")
-    print("Game initialization complete")
+    game_state.addLog(gameState, "Game initialization complete")
 end
 
--- Game logic update
-function love.update(dt)
-    -- Game logic update (currently empty)
+-- Handle keyboard input
+function love.keypressed(key)
+     game_state.handleInput(gameState, key)
 end
 
--- Game drawing
+-- Draw game
 function love.draw()
+    -- Clear screen
+    love.graphics.setColor(0, 0, 0)
+    love.graphics.rectangle("fill", 0, 0, 800, 600)
     love.graphics.setColor(1, 1, 1)
     
-    -- Draw game title
-    love.graphics.print("Regicide Game", 50, 20)
+    -- Draw player info
+    love.graphics.print("Hand Size: " .. #gameState.player.hand .. "/8", 50, 20)
+    love.graphics.print("Deck Size: " .. #gameState.player.deck, 50, 40)
     
-    -- Draw player hand information
-    love.graphics.print("Player Hand (" .. #gameState.player.hand .. "/" .. gameState.player.handLimit .. "):", 50, 50)
+    -- Draw player hand
+    love.graphics.print("Player Hand:", 50, 60)
     for i, card in ipairs(gameState.player.hand) do
-        local cardText = i .. ". " .. card.suit .. card.rank 
-        if card.type == CARD_TYPES.ROYAL then
-            cardText = cardText .. " [BOSS]"
+        local cardText = i .. ". " .. deck_manager.getCardAbbreviation(card)
+        
+        -- Highlight selected cards
+        local isSelected = false
+        local highlightColor = {1, 1, 0} -- Yellow for playing selecion
+        
+        if gameState.turn.phase == rules.TURN_PHASE.PLAYER then
+            for j, selectedCard in ipairs(gameState.turn.selectedCards) do
+                if selectedCard == card then
+                    isSelected = true
+                    break
+                end
+            end
+        elseif gameState.turn.phase == rules.TURN_PHASE.BOSS_DAMAGE then
+            for j, selectedCard in ipairs(gameState.turn.discardCards) do
+                if selectedCard == card then
+                    isSelected = true
+                    highlightColor = {1, 0.5, 0} -- Orange for damage selection
+                    break
+                end
+            end
+        end
+        
+        if isSelected then
+            love.graphics.setColor(unpack(highlightColor))
+            love.graphics.print(">> " .. cardText, 70, 70 + i * 20)
+            love.graphics.setColor(1, 1, 1) -- Reset to white
         else
-            cardText = cardText .. " (Attack:" .. card.attack .. ")"
+            love.graphics.print(cardText, 70, 70 + i * 20)
         end
-        love.graphics.print(cardText, 70, 70 + i * 20)
     end
     
-    -- Draw BOSS information
+    -- Draw BOSS info
     if gameState.boss.current then
-        love.graphics.print("Current BOSS: " .. gameState.boss.current.suit .. gameState.boss.current.rank, 300, 50)
-        love.graphics.print("Attack: " .. gameState.boss.current.attack, 300, 70)
-        love.graphics.print("Health: " .. gameState.boss.health .. "/" .. gameState.boss.current.health, 300, 90)
+        love.graphics.print("BOSS: " .. gameState.boss.current.rank .. " (" .. gameState.boss.current.suit .. ")", 300, 20)
+        love.graphics.print("BOSS Health: " .. gameState.boss.health, 300, 40)
+        love.graphics.print("BOSS Damage: " .. gameState.turn.bossDamage, 300, 60)
+
     else
-        love.graphics.print("All BOSS defeated!", 300, 50)
+        love.graphics.print("No BOSS", 300, 20)
     end
     
-    -- Draw deck information
-    love.graphics.print("Deck: " .. #gameState.player.deck, 300, 120)
-    if #gameState.player.deck > 0 then
-        local deckDisplay = "Top: "
-        -- Show top 3 cards from deck
-        for i = 1, math.min(3, #gameState.player.deck) do
-            deckDisplay = deckDisplay .. getCardAbbreviation(gameState.player.deck[i]) .. " "
+    -- Draw turn info
+    love.graphics.print("Turn Phase: " .. gameState.turn.phase, 50, 300)
+    love.graphics.print("Message: " .. gameState.turn.message, 50, 320)
+    
+    -- Draw played cards
+    if #gameState.turn.playCards > 0 then
+        love.graphics.print("Played Cards:", 50, 350)
+        for i, card in ipairs(gameState.turn.playCards) do
+            love.graphics.print(deck_manager.getCardAbbreviation(card), 70, 370 + i * 20)
         end
-        love.graphics.print(deckDisplay, 300, 140)
     end
     
-    love.graphics.print("Discard: " .. #gameState.player.discard, 300, 160)
-    if #gameState.player.discard > 0 then
-        local discardDisplay = "Top: "
-        -- Show top 3 cards from discard pile
-        for i = 1, math.min(3, #gameState.player.discard) do
-            discardDisplay = discardDisplay .. getCardAbbreviation(gameState.player.discard[i]) .. " "
-        end
-        love.graphics.print(discardDisplay, 300, 180)
-    end
-    
-    love.graphics.print("Remaining BOSS: " .. #gameState.boss.royalDeck, 300, 200)
-    
-    -- Draw operation hints
-    love.graphics.print("Controls:", 50, 280)
-    love.graphics.print("S - Shuffle deck", 70, 300)
-    love.graphics.print("D - Draw card", 70, 320)
-    love.graphics.print("1-8 - Discard corresponding card", 70, 340)
-    love.graphics.print("ESC - Quit game", 70, 360)
+    -- Draw control instructions
+    love.graphics.print("Controls:", 500, 20)
+    love.graphics.print("R - Restart game", 500, 40)
+    love.graphics.print("D - Draw card", 500, 60)
+    love.graphics.print("1-8 - Select/deselect card", 500, 80)
+    love.graphics.print("ENTER - Confirm selection", 500, 100)
+    love.graphics.print("SPACE - Next phase", 500, 120)
     
     -- Draw operation log
-    love.graphics.print("Log:", 50, 400)
+    love.graphics.print("Log:", 50, 440)
     for i, logEntry in ipairs(gameState.log) do
-        love.graphics.print(logEntry, 70, 420 + i * 20)
-    end
-    
-    -- Draw turn state
-    love.graphics.print("Current Turn: " .. gameState.turn.phase, 300, 220)
-    love.graphics.print(gameState.turn.message, 300, 240)
-end
-
--- Keyboard input handling
-function love.keypressed(key)
-    if key == "escape" then
-        love.event.quit()
-    elseif key == "s" then
-        -- Shuffle deck
-        gameState.player.deck = shuffleDeck(gameState.player.deck)
-        addLog("Deck shuffled")
-        gameState.turn.message = "Deck shuffled"
-    elseif key == "d" then
-        -- Draw card
-        drawCard()
-        gameState.turn.message = "Draw card completed"
-    elseif key >= "1" and key <= "8" then
-        -- Discard card
-        local cardIndex = tonumber(key)
-        discardCard(cardIndex)
-        gameState.turn.message = "Discard card completed"
+        love.graphics.print(logEntry, 70, 460 + i * 20)
     end
 end
