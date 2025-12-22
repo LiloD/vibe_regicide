@@ -13,16 +13,16 @@
 -- 模块常量：
 -- SUITS                    - 花色定义：Spades(黑桃), Hearts(红心), Clubs(梅花), Diamonds(方块)
 -- CARD_TYPES              - 卡牌类型：Normal(普通牌), Royal(皇家牌)
--- SUIT_ABBREVIATIONS      - 花色缩写映射表：C/D/H/S
+-- SUIT_ABBREVIATIONS      - 花色缩写映射表：♠/♥/♣/♦ (Unicode花色符号)
 --
 -- 核心功能分类：
 --
 -- 卡牌工具函数：
--- getCardAbbreviation(card)           - 获取卡牌缩写（如C5表示梅花5）
+-- getCardAbbreviation(card)           - 获取卡牌缩写（如♣5表示梅花5）
 -- createCard(suit, rank, type)        - 创建卡牌数据结构，自动设置攻击力和生命值
 --
 -- 牌堆创建函数：
--- createPlayerDeck()                  - 创建玩家牌堆（A, 2-10，共40张普通牌）
+-- createPlayerDeck()                  - 创建玩家牌堆（A, 2-10，共36张普通牌）
 -- createBossDeck()                    - 创建BOSS牌堆（J, Q, K，共12张皇家牌）
 --
 -- 牌堆操作函数：
@@ -55,7 +55,7 @@ deck_manager.CARD_TYPES = {
     ROYAL = "Royal"
 }
 
--- Suit abbreviation mapping
+-- Suit abbreviation mapping using Unicode symbols
 deck_manager.SUIT_ABBREVIATIONS = {
     ["Clubs"] = "C",
     ["Diamonds"] = "D",
@@ -82,8 +82,18 @@ function deck_manager.createCard(suit, rank, cardType)
     -- Set properties based on card type
     if cardType == deck_manager.CARD_TYPES.NORMAL then
         -- Normal cards: A=1, 2=2, ..., 10=10
-        card.attack = rank
-        card.health = 0
+        if rank == "A" then
+            card.attack = 1
+        elseif rank == "J" then
+            card.attack = 10
+        elseif rank == "Q" then
+            card.attack = 15
+        elseif rank == "K" then
+            card.attack = 20
+        else
+            card.attack = rank
+        end
+        card.health = 0 -- normal card do not have health
     else
         -- Royal cards: J=10/20, Q=15/30, K=20/40 (attack/health)
         if rank == "J" then
@@ -104,18 +114,19 @@ end
 -- Create player deck (all cards except J, Q, K)
 function deck_manager.createPlayerDeck()
     local deck = {}
-    local suits = {"Clubs", "Diamonds", "Hearts", "Spades"}
-    
+
     -- Add normal cards (A, 2-10) only
-    for _, suit in ipairs(suits) do
+    for _, suit in pairs(deck_manager.SUITS) do
         -- Add Aces
-        table.insert(deck, {suit = suit, rank = "A", type = "Normal", attack = 1})
+        table.insert(deck, deck_manager.createCard(suit, "A", deck_manager.CARD_TYPES.NORMAL))
         
         -- Add number cards (2-10)
         for rank = 2, 10 do
-            table.insert(deck, {suit = suit, rank = rank, type = "Normal", attack = rank})
+            table.insert(deck, deck_manager.createCard(suit, rank, deck_manager.CARD_TYPES.NORMAL))
         end
     end
+
+    deck_manager.shuffleDeck(deck)
     
     return deck
 end
@@ -123,18 +134,19 @@ end
 -- Create BOSS deck (J, Q, K only)
 function deck_manager.createBossDeck()
     local deck = {}
-    local suits = {"Clubs", "Diamonds", "Hearts", "Spades"}
-    
-    -- Add royal cards (J, Q, K) for BOSS deck
-    for _, suit in ipairs(suits) do
-        local royalCards = {"J", "Q", "K"}
-        local royalAttacks = {J = 10, Q = 15, K = 20}
-        
-        for _, rank in ipairs(royalCards) do
-            table.insert(deck, {suit = suit, rank = rank, type = "Royal", attack = royalAttacks[rank], health = 20})
-        end
+    local ranks = {"J", "Q", "K"}
+
+    for _, rank in ipairs(ranks) do
+        local rankDeck = {}
+         for _, suit in pairs(deck_manager.SUITS) do
+             table.insert(rankDeck, deck_manager.createCard(suit, rank, deck_manager.CARD_TYPES.ROYAL))
+         end
+         deck_manager.shuffleDeck(rankDeck)
+         for _, card in ipairs(rankDeck) do
+             table.insert(deck, card)
+         end
     end
-    
+
     return deck
 end
 
@@ -165,51 +177,16 @@ function deck_manager.addCardToHand(hand, card, maxHandSize)
     return false
 end
 
--- Discard card from hand
-function deck_manager.discardCardFromHand(hand, cardIndex, discardPile)
-    if cardIndex < 1 or cardIndex > #hand then
-        return false
-    end
-    
-    local card = table.remove(hand, cardIndex)
-    if discardPile then
-        table.insert(discardPile, card)
-    end
-    
-    return true
-end
-
 -- Initialize player deck and hand
 function deck_manager.initializePlayerDeck(state)
     -- Create and shuffle player deck (A, 2-10 only)
     state.player.deck = deck_manager.createPlayerDeck()
-    deck_manager.shuffleDeck(state.player.deck)
-    
-    -- Draw initial hand (5 cards)
-    state.player.hand = {}
-    for i = 1, 5 do
-        local card = deck_manager.drawCard(state.player.deck)
-        if card then
-            deck_manager.addCardToHand(state.player.hand, card)
-        end
-    end
-    
-    -- Initialize discard pile
-    state.player.discard = {}
 end
 
 -- Initialize boss deck
 function deck_manager.initializeBossDeck(state)
     -- Create boss deck (J, Q, K only)
     state.boss.deck = deck_manager.createBossDeck()
-    
-    -- Shuffle boss deck
-    deck_manager.shuffleDeck(state.boss.deck)
-    
-    -- Set current boss (first card in boss deck)
-    state.boss.current = state.boss.deck[1]
-    state.boss.health = state.boss.current.health
-    state.turn.bossDamage = state.boss.current.attack
 end
 
 return deck_manager

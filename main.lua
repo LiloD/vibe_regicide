@@ -44,17 +44,16 @@ function love.load()
     -- Set window size
     love.window.setMode(800, 600)
     
-    -- Initialize game state
-    gameState = game_state.initializeGameState()
-    
-    -- Initialize decks
-    deck_manager.initializePlayerDeck(gameState)
-    deck_manager.initializeBossDeck(gameState)
+    local randomSeed = os.time()
+    --  local randomSeed = 1766397099
+    print("Random Seed: " .. randomSeed)
+    math.randomseed(randomSeed)
 
-    -- Set initial phase
+    -- Initialize game state
+    gameState = game_state.init()
+
+    -- Start game directly change to player phase
     game_state.change_phase(gameState, rules.TURN_PHASE.PLAYER)
-    
-    game_state.addLog(gameState, "Game initialization complete")
 end
 
 -- Handle keyboard input
