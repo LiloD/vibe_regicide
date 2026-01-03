@@ -1,8 +1,13 @@
 local rules = require("rules")
 local game = {
     game_data = {},
-    fsm = {},
+    states = {},
     current_state = nil,
+
+    -- game states enum
+    STATE_PLAYER = "player",
+    STATE_EFFECTS = "effects",
+    STATE_BOSS = "boss",
 }
 
 -- 玩家打牌回合，选择牌进行攻击
@@ -25,9 +30,7 @@ local function player_state(game_data)
             local cardIndex = tonumber(key)
             game.handlePlayCardSelection(game_data, cardIndex)
         elseif key == "return" then
-            print("confirm play card selection")
             game.confirmPlayCardSelection(game_data)
-
             -- change to effects state
             game.change_state("effects")
         end
@@ -101,11 +104,11 @@ end
 function game.init()
     rules.init(game.game_data)
 
-    game.fsm["player"] = player_state(game.game_data)
-    game.fsm["effects"] = effects_state(game.game_data)
-    game.fsm["boss"] = boss_state(game.game_data)
+    game.states[game.STATE_PLAYER] = player_state(game.game_data)
+    game.states[game.STATE_EFFECTS] = effects_state(game.game_data)
+    game.states[game.STATE_BOSS] = boss_state(game.game_data)
 
-    game.change_state("player")
+    game.change_state(game.STATE_PLAYER)
 end
 
 function game.keypressed(key)
@@ -116,12 +119,11 @@ end
 
 -- change inner game state
 function game.change_state(name)
-    print("change to state: " .. name)
     if game.current_state and game.current_state.on_exit then
         game.current_state.on_exit(game.game_data)
     end
 
-    game.current_state = game.fsm[name]
+    game.current_state = game.states[name]
 
     if game.current_state and game.current_state.on_enter then
         game.current_state.on_enter(game.game_data)
@@ -179,7 +181,7 @@ function game.confirmPlayCardSelection(game_data)
     end
 
     -- Move selected cards to played cards
-    for i, card in ipairs(game_data.turn.selectedCards) do
+    for _, card in ipairs(game_data.turn.selectedCards) do
         table.insert(game_data.turn.playCards, card)
         -- Remove from hand
         for j = #game_data.player.hand, 1, -1 do

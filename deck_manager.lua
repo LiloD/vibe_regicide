@@ -43,16 +43,18 @@ local deck_manager = {}
 
 -- Card suit definitions
 deck_manager.SUITS = {
-    SPADES = "Spades",    -- Spades: Lower enemy attack by N
-    HEARTS = "Hearts",   -- Hearts: Take N cards from discard to deck bottom
-    CLUBS = "Clubs",     -- Clubs: Deal 2*N damage
-    DIAMONDS = "Diamonds" -- Diamonds: Draw N cards (up to hand limit)
+    SPADES = "Spades",     -- Spades: Lower enemy attack by N
+    HEARTS = "Hearts",     -- Hearts: Take N cards from discard to deck bottom
+    CLUBS = "Clubs",       -- Clubs: Deal 2*N damage
+    DIAMONDS = "Diamonds", -- Diamonds: Draw N cards (up to hand limit)
+    NO_SUIT = "NoSuit",    -- NoSuit: No effect
 }
 
 -- Card type definitions
 deck_manager.CARD_TYPES = {
     NORMAL = "Normal",
-    ROYAL = "Royal"
+    ROYAL = "Royal",
+    JESTER = "Jester",
 }
 
 -- Suit abbreviation mapping using Unicode symbols
@@ -65,7 +67,7 @@ deck_manager.SUIT_ABBREVIATIONS = {
 
 -- Function to get card abbreviation
 function deck_manager.getCardAbbreviation(card)
-    local suitAbbr = deck_manager.SUIT_ABBREVIATIONS[card.suit] or card.suit:sub(1,1)
+    local suitAbbr = deck_manager.SUIT_ABBREVIATIONS[card.suit] or card.suit:sub(1, 1)
     return suitAbbr .. card.rank
 end
 
@@ -78,7 +80,7 @@ function deck_manager.createCard(suit, rank, cardType)
         attack = 0,
         health = 0
     }
-    
+
     -- Set properties based on card type
     if cardType == deck_manager.CARD_TYPES.NORMAL then
         -- Normal cards: A=1, 2=2, ..., 10=10
@@ -94,7 +96,7 @@ function deck_manager.createCard(suit, rank, cardType)
             card.attack = rank
         end
         card.health = 0 -- normal card do not have health
-    else
+    elseif cardType == deck_manager.CARD_TYPES.ROYAL then
         -- Royal cards: J=10/20, Q=15/30, K=20/40 (attack/health)
         if rank == "J" then
             card.attack = 10
@@ -106,8 +108,14 @@ function deck_manager.createCard(suit, rank, cardType)
             card.attack = 20
             card.health = 40
         end
+    elseif cardType == deck_manager.CARD_TYPES.JESTER then
+        -- Jester cards: attack=0, health=0, no suit
+        card.suit = deck_manager.SUITS.NO_SUIT
+        card.rank = 0
+        card.attack = 0
+        card.health = 0
     end
-    
+
     return card
 end
 
@@ -119,7 +127,7 @@ function deck_manager.createPlayerDeck()
     for _, suit in pairs(deck_manager.SUITS) do
         -- Add Aces
         table.insert(deck, deck_manager.createCard(suit, "A", deck_manager.CARD_TYPES.NORMAL))
-        
+
         -- Add number cards (2-10)
         for rank = 2, 10 do
             table.insert(deck, deck_manager.createCard(suit, rank, deck_manager.CARD_TYPES.NORMAL))
@@ -127,24 +135,35 @@ function deck_manager.createPlayerDeck()
     end
 
     deck_manager.shuffleDeck(deck)
-    
+    return deck
+end
+
+-- Crate Jester deck
+function deck_manager.createJesterDeck()
+    local deck = {}
+
+    -- Add 2 Jester
+    for _ = 1, 2 do
+        table.insert(deck, deck_manager.createCard(deck_manager.SUITS.NO_SUIT, 0, deck_manager.CARD_TYPES.JESTER))
+    end
+
     return deck
 end
 
 -- Create BOSS deck (J, Q, K only)
 function deck_manager.createBossDeck()
     local deck = {}
-    local ranks = {"J", "Q", "K"}
+    local ranks = { "J", "Q", "K" }
 
     for _, rank in ipairs(ranks) do
         local rankDeck = {}
-         for _, suit in pairs(deck_manager.SUITS) do
-             table.insert(rankDeck, deck_manager.createCard(suit, rank, deck_manager.CARD_TYPES.ROYAL))
-         end
-         deck_manager.shuffleDeck(rankDeck)
-         for _, card in ipairs(rankDeck) do
-             table.insert(deck, card)
-         end
+        for _, suit in pairs(deck_manager.SUITS) do
+            table.insert(rankDeck, deck_manager.createCard(suit, rank, deck_manager.CARD_TYPES.ROYAL))
+        end
+        deck_manager.shuffleDeck(rankDeck)
+        for _, card in ipairs(rankDeck) do
+            table.insert(deck, card)
+        end
     end
 
     return deck
@@ -181,6 +200,7 @@ end
 function deck_manager.initializePlayerDeck(state)
     -- Create and shuffle player deck (A, 2-10 only)
     state.player.deck = deck_manager.createPlayerDeck()
+    state.player.jester = deck_manager.createJesterDeck()
 end
 
 -- Initialize boss deck
