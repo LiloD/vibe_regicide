@@ -2,6 +2,18 @@ local game = require("game")
 
 local test_game = {}
 
+-- 花色对应的Unicode符号
+local suit_symbols = {
+    Hearts = "♥",
+    Diamonds = "♦",
+    Clubs = "♣",
+    Spades = "♠"
+}
+
+function test_game.get_suit_symbol(suit)
+    return suit_symbols[suit] or suit
+end
+
 function test_game.clear_screen()
     -- 根据操作系统选择清屏命令
     if package.config:sub(1, 1) == "\\" then
@@ -44,7 +56,8 @@ function test_game.run()
         -- 显示BOSS信息
         if game.game_data.boss.current then
             local bossCard = game.game_data.boss.current
-            print("当前BOSS: " .. bossCard.suit .. " " .. bossCard.rank)
+            local suitSymbol = test_game.get_suit_symbol(bossCard.suit)
+            print("当前BOSS: " .. suitSymbol .. " " .. bossCard.rank)
             print("BOSS生命值: " .. game.game_data.boss.health)
             print("BOSS攻击力: " .. game.game_data.turn.bossDamage)
         else
@@ -102,7 +115,8 @@ function test_game.interactive_player_turn()
     -- 显示BOSS信息
     if game.game_data.boss.current then
         local bossCard = game.game_data.boss.current
-        print("当前BOSS: " .. bossCard.suit .. " " .. bossCard.rank)
+        local suitSymbol = test_game.get_suit_symbol(bossCard.suit)
+        print("当前BOSS: " .. suitSymbol .. " " .. bossCard.rank)
         print("BOSS生命值: " .. game.game_data.boss.health)
         print("BOSS攻击力: " .. game.game_data.turn.bossDamage)
     else
@@ -112,11 +126,13 @@ function test_game.interactive_player_turn()
     print("\n当前玩家手牌:")
     for i, card in ipairs(game.game_data.player.hand) do
         local effectInfo = test_game.getCardEffectInfo(card)
-        print(string.format("  %d. %s%s (攻击力: %d) - %s", i, card.suit, card.rank, card.attack, effectInfo))
+        local suitSymbol = test_game.get_suit_symbol(card.suit)
+        print(string.format("  %d. %s %s (攻击力: %d) - %s", i, suitSymbol, card.rank, card.attack, effectInfo))
     end
 
     print("\n请选择卡牌对BOSS造成伤害")
     print("输入数字 1-8 选择/取消选择卡牌，输入 'enter' 确认选择")
+    print("输入 'j' 使用小丑牌重新抽牌")
     print("输入 'hand' 查看当前手牌，输入 'boss' 查看BOSS状态")
 
 
@@ -128,6 +144,7 @@ function test_game.interactive_player_turn()
             print("\n玩家回合操作说明:")
             print("  数字 1-8: 选择/取消选择对应卡牌")
             print("  enter: 确认卡牌选择")
+            print("  j: 使用小丑牌重新抽牌")
             print("  hand: 查看当前手牌")
             print("  boss: 查看BOSS状态")
             print("  status: 查看游戏状态")
@@ -144,11 +161,24 @@ function test_game.interactive_player_turn()
             print("\n当前BOSS状态:")
             if game.game_data.boss.current then
                 local bossCard = game.game_data.boss.current
-                print("  BOSS: " .. bossCard.suit .. " " .. bossCard.rank)
+                local suitSymbol = test_game.get_suit_symbol(bossCard.suit)
+                print("  BOSS: " .. suitSymbol .. " " .. bossCard.rank)
                 print("  生命值: " .. game.game_data.boss.health)
                 print("  攻击力: " .. game.game_data.turn.bossDamage)
             else
                 print("  当前BOSS: 无")
+            end
+        elseif input == "j" then
+            -- 使用小丑牌重新抽牌
+            game.keypressed("jester")
+            print("已使用小丑牌，手牌已重新抽取")
+
+            -- 重新显示当前手牌
+            print("\n当前玩家手牌:")
+            for i, card in ipairs(game.game_data.player.hand) do
+                local effectInfo = test_game.getCardEffectInfo(card)
+                local suitSymbol = test_game.get_suit_symbol(card.suit)
+                print(string.format("  %d. %s %s (攻击力: %d) - %s", i, suitSymbol, card.rank, card.attack, effectInfo))
             end
         elseif input == "enter" or input == "" then
             -- 使用游戏内置的按键处理
@@ -187,7 +217,8 @@ function test_game.interactive_boss_turn()
     -- 显示BOSS信息
     if game.game_data.boss.current then
         local bossCard = game.game_data.boss.current
-        print("当前BOSS: " .. bossCard.suit .. " " .. bossCard.rank)
+        local suitSymbol = test_game.get_suit_symbol(bossCard.suit)
+        print("当前BOSS: " .. suitSymbol .. " " .. bossCard.rank)
         print("BOSS生命值: " .. game.game_data.boss.health)
         print("BOSS攻击力: " .. game.game_data.turn.bossDamage)
     else
@@ -197,12 +228,14 @@ function test_game.interactive_boss_turn()
     print("\n当前玩家手牌:")
     for i, card in ipairs(game.game_data.player.hand) do
         local effectInfo = test_game.getCardEffectInfo(card)
-        print(string.format("  %d. %s%s (防御值: %d) - %s", i, card.suit, card.rank, card.attack, effectInfo))
+        local suitSymbol = test_game.get_suit_symbol(card.suit)
+        print(string.format("  %d. %s %s (防御值: %d) - %s", i, suitSymbol, card.rank, card.attack, effectInfo))
     end
 
     print("\nBOSS即将发动攻击，攻击力: " .. game.game_data.turn.bossDamage)
     print("请选择弃牌来抵挡BOSS攻击")
     print("输入数字 1-8 选择/取消选择弃牌，输入 'enter' 确认选择")
+    print("输入 'j' 使用小丑牌重新抽牌")
     print("输入 'hand' 查看当前手牌，输入 'boss' 查看BOSS状态")
 
     local game_ended = false
@@ -215,6 +248,7 @@ function test_game.interactive_boss_turn()
             print("\nBOSS回合操作说明:")
             print("  数字 1-8: 选择/取消选择弃牌")
             print("  enter: 确认弃牌选择")
+            print("  j: 使用小丑牌重新抽牌")
             print("  hand: 查看当前手牌")
             print("  boss: 查看BOSS状态")
             print("  status: 查看游戏状态")
@@ -231,11 +265,24 @@ function test_game.interactive_boss_turn()
             print("\n当前BOSS状态:")
             if game.game_data.boss.current then
                 local bossCard = game.game_data.boss.current
-                print("  BOSS: " .. bossCard.suit .. " " .. bossCard.rank)
+                local suitSymbol = test_game.get_suit_symbol(bossCard.suit)
+                print("  BOSS: " .. suitSymbol .. " " .. bossCard.rank)
                 print("  生命值: " .. game.game_data.boss.health)
                 print("  攻击力: " .. game.game_data.turn.bossDamage)
             else
                 print("  当前BOSS: 无")
+            end
+        elseif input == "j" then
+            -- 使用小丑牌重新抽牌
+            game.keypressed("jester")
+            print("已使用小丑牌，手牌已重新抽取")
+
+            -- 重新显示当前手牌
+            print("\n当前玩家手牌:")
+            for i, card in ipairs(game.game_data.player.hand) do
+                local effectInfo = test_game.getCardEffectInfo(card)
+                local suitSymbol = test_game.get_suit_symbol(card.suit)
+                print(string.format("  %d. %s %s (防御值: %d) - %s", i, suitSymbol, card.rank, card.attack, effectInfo))
             end
         elseif input == "enter" or input == "" then
             -- 使用游戏内置的按键处理
@@ -299,10 +346,12 @@ end
 function test_game.show_game_status()
     print("\n--- 游戏状态信息 ---")
 
+    -- BOSS信息
     print("BOSS信息:")
     if game.game_data.boss.current then
         local bossCard = game.game_data.boss.current
-        print("  当前BOSS: " .. bossCard.suit .. " " .. bossCard.rank)
+        local suitSymbol = test_game.get_suit_symbol(bossCard.suit)
+        print("  当前BOSS: " .. suitSymbol .. " " .. bossCard.rank)
         print("  生命值: " .. game.game_data.boss.health)
         print("  攻击力: " .. game.game_data.turn.bossDamage)
     else

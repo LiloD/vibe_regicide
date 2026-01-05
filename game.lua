@@ -29,6 +29,8 @@ local function player_state(game_data)
         if key >= "1" and key <= "8" then
             local cardIndex = tonumber(key)
             game.handlePlayCardSelection(game_data, cardIndex)
+        elseif key == "jester" then
+            game.activeJester(game_data)
         elseif key == "return" then
             game.confirmPlayCardSelection(game_data)
             -- change to effects state
@@ -88,6 +90,8 @@ local function boss_state(game_data)
         if key >= "1" and key <= "8" then
             local cardIndex = tonumber(key)
             game.handleDiscardCardSelection(game_data, cardIndex)
+        elseif key == "jester" then
+            game.activeJester(game_data)
         elseif key == "return" then
             local isPlayerDefeated = game.confirmDiscardSelection(game_data)
             if not isPlayerDefeated then
@@ -171,6 +175,21 @@ function game.handlePlayCardSelection(game_data, cardIndex)
     end
 
     game.addLog(game_data, "Invalid card combination")
+end
+
+function game.activeJester(game_data)
+    -- player only have two jester cards, they don't have any different
+    if #game_data.player.jester > 0 then
+        rules.applyJesterEffect(game_data)
+        table.remove(game_data.player.jester, 1)
+
+        -- 清空选择的牌，因为 jester 会重新抽牌
+        if #game_data.turn.selectedCards > 0 then
+            game_data.turn.selectedCards = {}
+        end
+    else
+        game.addLog(game_data, "No jester card available")
+    end
 end
 
 -- Confirm card selection

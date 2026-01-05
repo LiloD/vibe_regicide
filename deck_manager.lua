@@ -47,8 +47,9 @@ deck_manager.SUITS = {
     HEARTS = "Hearts",     -- Hearts: Take N cards from discard to deck bottom
     CLUBS = "Clubs",       -- Clubs: Deal 2*N damage
     DIAMONDS = "Diamonds", -- Diamonds: Draw N cards (up to hand limit)
-    NO_SUIT = "NoSuit",    -- NoSuit: No effect
 }
+
+deck_manager.NO_SUIT = "NoSuit"
 
 -- Card type definitions
 deck_manager.CARD_TYPES = {
@@ -110,7 +111,7 @@ function deck_manager.createCard(suit, rank, cardType)
         end
     elseif cardType == deck_manager.CARD_TYPES.JESTER then
         -- Jester cards: attack=0, health=0, no suit
-        card.suit = deck_manager.SUITS.NO_SUIT
+        card.suit = deck_manager.NO_SUIT
         card.rank = 0
         card.attack = 0
         card.health = 0
@@ -144,7 +145,7 @@ function deck_manager.createJesterDeck()
 
     -- Add 2 Jester
     for _ = 1, 2 do
-        table.insert(deck, deck_manager.createCard(deck_manager.SUITS.NO_SUIT, 0, deck_manager.CARD_TYPES.JESTER))
+        table.insert(deck, deck_manager.createCard(deck_manager.NO_SUIT, 0, deck_manager.CARD_TYPES.JESTER))
     end
 
     return deck
